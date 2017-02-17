@@ -1,13 +1,22 @@
 package dig;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Iterator;
 
 import org.xbill.DNS.DClass;
+import org.xbill.DNS.DNSKEYRecord;
+import org.xbill.DNS.DNSSEC;
 import org.xbill.DNS.ExtendedResolver;
 import org.xbill.DNS.Lookup;
+import org.xbill.DNS.Message;
 import org.xbill.DNS.Name;
+import org.xbill.DNS.Options;
+import org.xbill.DNS.RRset;
 import org.xbill.DNS.Record;
+import org.xbill.DNS.Resolver;
+import org.xbill.DNS.Section;
 import org.xbill.DNS.SimpleResolver;
 import org.xbill.DNS.TextParseException;
 import org.xbill.DNS.Type;
@@ -44,89 +53,76 @@ public class Resolve {
 		
 	}
 
-	public void query(String name, int type) throws TextParseException, UnknownHostException {
+	public void query(String in, int type) throws IOException {
 		
-		Name query = Name.fromString(name);
+		Name name = Name.fromString(in);
 		
 		SimpleResolver resolver = new SimpleResolver();
 		InetAddress rootServer = rootServers[(int) (Math.random() * rootServers.length)];
 		System.out.println(rootServer);
 		resolver.setAddress(rootServer);
 		resolver.setTCP(true);
-		Lookup.setDefaultResolver(resolver);
 		
-		ExtendedResolver er = new ExtendedResolver();
-	    er.addResolver(resolver);
+		Message lookup, result; 
+			
+	    Record lookupRecord = Record.newRecord(name, Type.A, DClass.IN);
+			
+	    
 		
-	    String curr = "";
+		Record secRecord = Record.newRecord(name, Type.DNSKEY, DClass.IN);
 		
-		for(int j=query.labels()-1; j>=0 ; j--){
-			curr = "co.jp.";//query.getLabelString(j) + "." + curr; 
+	    lookup = Message.newQuery(lookupRecord);	
+		result = resolver.send(lookup);
+				
+		while(result.getSectionArray(Section.ANSWER).length == 0){
 			
-			Lookup lookup; 
+			Record[] records = result.getSectionArray(Section.AUTHORITY);
 			
-			if(j == 0){
-				lookup = new Lookup(curr, type);	
+			if(records.length <= 1){
+				System.err.println("lookup failed(host not found)");
+				return;
 			}
-			else{
-				lookup = new Lookup(curr, Type.ANY);	
+			
+			for (int i = 0; i < records.length; i++) {
+				Record record = (Record)records[i];
+				System.out.println(record.toString());
 			}
+			System.out.println("....");
+						
+			resolver = new SimpleResolver(records[1].rdataToString());
+			result = resolver.send(lookup);
 			
-			lookup.setResolver(er);
-			Record[] records = lookup.run();
+		}
+		
+		lookupRecord = Record.newRecord(name, Type.ANY, DClass.IN);
 			
-			for(Name alias: lookup.getAliases())
-				System.out.println(alias.toString());
-			
-			
-			
-			if(lookup.getResult() == Lookup.SUCCESSFUL){
-				System.out.print("...");
-				System.out.println(records[records.length-1].getType());
-				
-				if(j == 0)
-				{
-					System.out.println();
-					for (int i = 0; i < records.length; i++) {
-						Record record = (Record)records[i];
-						System.out.println(record.toString());
-					}
-					break;
-				}
-				
-				
-			
-			resolver = new SimpleResolver();
-			//resolver.setAddress(InetAddress.getByName("root.dns.jp"));//lookup.getAnswers()[0].rdataToString()));
-			//System.out.println(InetAddress.getByName(lookup.getAnswers()[0].rdataToString()));
-			
-			//System.out.println(records[0].getAdditionalName());
-			
-			er = new ExtendedResolver();
-			er.addResolver(resolver);
-				
-			}
-			else{
-				System.err.print("\nlookup failed(");
-				switch(lookup.getResult()){
-					case Lookup.HOST_NOT_FOUND:
-						System.err.print("host not found");
-						break;
-					case Lookup.TRY_AGAIN:
-						System.err.print("try again");
-						break;
-					case Lookup.TYPE_NOT_FOUND:
-						System.err.print("type not found");
-						break;
-					case Lookup.UNRECOVERABLE:
-						System.err.print("unrecoverable");
-						break;
-				}
-				
-				System.err.println(")");
-				break;
+		lookup = Message.newQuery(lookupRecord);	
+		result = resolver.send(lookup);
+		
+		Record[] records = result.getSectionArray(Section.ANSWER);
+		
+		if(records[records.length-1].getType() == Type.CNAME){
+			System.out.println("here");
+			query(records[records.length-1].rdataToString() ,type);
+			return;
+		}
+		
+		boolean recordFound = false;
+		for (int i = 0; i < records.length; i++) {
+			Record record = (Record)records[i];
+			if(record.getType() == type || type == Type.ANY){
+				System.out.println(record.toString());
+				recordFound = true;
 			}
 		}
+		
+		if(recordFound) {
+			System.out.println("lookup success");
+		}
+		else {
+			System.err.println("lookup failed(type not found)");
+		}
+		
 	}
 	
 

@@ -1,9 +1,7 @@
 package dig;
 
 import java.io.IOException;
-import java.net.UnknownHostException;
 
-import org.xbill.DNS.TextParseException;
 import org.xbill.DNS.Type;
 
 
@@ -21,7 +19,19 @@ public class MyDig {
 	public static void main(String[] args) throws IOException {
 		
 		Resolve resolve = new Resolve();
-		resolve.query("co.jp", Type.ANY);
+		//resolve.query("www.google.co.jp.", Type.ANY);
+		int type;
+		
+		if(args[1].equals("NS")) type = Type.NS;
+		else if(args[1].equals("A")) type = Type.A;
+		else if(args[1].equals("MX")) type = Type.MX;
+		else {
+			System.out.println("Type input invalid. Type resolved to default(ANY)");
+			type = Type.ANY;
+		}
+		
+		
+		resolve.query(args[0]+".", type);
 		
 	}
 
