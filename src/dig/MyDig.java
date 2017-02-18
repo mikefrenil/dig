@@ -16,7 +16,7 @@ public class MyDig {
 	
 	
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) {
 		
 		Resolve resolve = new Resolve();
 		//resolve.query("www.google.co.jp.", Type.ANY);
@@ -31,7 +31,11 @@ public class MyDig {
 		}
 		
 		
-		resolve.query(args[0]+".", type);
+		try {
+			resolve.query(args[0]+".", type);
+		} catch (IOException e) {
+			System.err.println("lookup failed");
+		}
 		
 	}
 
